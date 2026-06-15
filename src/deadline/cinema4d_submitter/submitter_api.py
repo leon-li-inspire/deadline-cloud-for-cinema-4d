@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from deadline.client.submitter_api import SubmitterAPI, SubmitterSettings
@@ -31,7 +31,9 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         settings.name = doc.GetDocumentName() or "Untitled"
         settings.project_path = doc.GetDocumentPath() or ""
 
-        scene_file = os.path.join(settings.project_path, settings.name) if settings.project_path else ""
+        scene_file = (
+            os.path.join(settings.project_path, settings.name) if settings.project_path else ""
+        )
         settings.input_filenames = [scene_file] if scene_file else []
 
         rd = doc.GetActiveRenderData()
@@ -65,7 +67,6 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         settings: SubmitterSettings,
         host_requirements: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        import c4d  # type: ignore[import]
         import yaml
         from pathlib import Path
 
@@ -91,9 +92,7 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         import c4d  # type: ignore[import]
 
         doc = c4d.documents.GetActiveDocument()
-        scene_file = os.path.join(
-            doc.GetDocumentPath() or "", doc.GetDocumentName() or ""
-        )
+        scene_file = os.path.join(doc.GetDocumentPath() or "", doc.GetDocumentName() or "")
 
         parameter_values: list[dict[str, Any]] = [
             {"name": "Cinema4DFile", "value": scene_file},
