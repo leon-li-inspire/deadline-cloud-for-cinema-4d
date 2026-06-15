@@ -117,7 +117,7 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         from deadline.client.job_bundle.submission import AssetReferences
 
         introspector = AssetIntrospector()
-        assets = introspector.collect_assets()
+        assets = introspector.parse_scene_assets()
 
         input_filenames = set()
         for asset in assets:
