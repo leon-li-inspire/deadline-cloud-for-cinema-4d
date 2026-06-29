@@ -3,9 +3,17 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
+import yaml
+
+import c4d  # type: ignore[import]
+
+from deadline.client.job_bundle.submission import AssetReferences
 from deadline.client.submitter_api import SubmitterAPI, SubmitterSettings
+
+from .assets import AssetIntrospector
 
 
 @dataclass
@@ -23,8 +31,6 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
     """SubmitterAPI implementation for Cinema 4D submissions."""
 
     def get_settings(self) -> Cinema4DSubmitterSettings:
-        import c4d  # type: ignore[import]
-
         settings = Cinema4DSubmitterSettings()
         doc = c4d.documents.GetActiveDocument()
 
@@ -67,9 +73,6 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         settings: SubmitterSettings,
         host_requirements: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        import yaml
-        from pathlib import Path
-
         with open(Path(__file__).parent / "default_cinema4d_job_template.yaml") as fh:
             job_template = yaml.safe_load(fh)
 
@@ -89,22 +92,27 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         settings: SubmitterSettings,
         queue_parameters: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        import c4d  # type: ignore[import]
-
         doc = c4d.documents.GetActiveDocument()
         scene_file = os.path.join(doc.GetDocumentPath() or "", doc.GetDocumentName() or "")
 
         parameter_values: list[dict[str, Any]] = [
             {"name": "Cinema4DFile", "value": scene_file},
-            {"name": "Frames", "value": settings.frame_list},
             {"name": "deadline:priority", "value": settings.priority},
             {"name": "deadline:targetTaskRunStatus", "value": settings.initial_status},
             {"name": "deadline:maxFailedTasksCount", "value": settings.max_failed_tasks_count},
             {"name": "deadline:maxRetriesPerTask", "value": settings.max_retries_per_task},
         ]
 
-        if isinstance(settings, Cinema4DSubmitterSettings) and settings.take_name:
-            parameter_values.append({"name": "Take", "value": settings.take_name})
+        # The "Frames" job parameter has minLength: 1 in the job template, so an
+        # empty frame range (e.g. no active RenderData) would violate the
+        # constraint and fail CreateJob. Only emit it when non-empty.
+        if settings.frame_list:
+            parameter_values.append({"name": "Frames", "value": settings.frame_list})
+
+        # NOTE: The take is passed to the render via the "TAKE" stepEnvironment
+        # variable in the job template, not as a job parameter. The template
+        # defines no "Take" parameter, so emitting one would fail CreateJob with
+        # an unknown-parameter ValidationException.
 
         parameter_values.extend(
             {"name": param["name"], "value": param["value"]} for param in queue_parameters
@@ -113,9 +121,6 @@ class Cinema4DSubmitterAPI(SubmitterAPI):
         return parameter_values
 
     def get_asset_references(self, settings: SubmitterSettings) -> dict[str, Any]:
-        from .assets import AssetIntrospector
-        from deadline.client.job_bundle.submission import AssetReferences
-
         introspector = AssetIntrospector()
         assets = introspector.parse_scene_assets()
 
